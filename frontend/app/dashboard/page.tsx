@@ -32,7 +32,7 @@ export default function DashboardPage() {
         const message =
           err instanceof ApiError
             ? err.message
-            : 'Failed to load designs. Is the backend running?';
+            : 'Failed to load designs. Please try again later.';
         setError(message);
         toast.error('Failed to load designs', { description: message });
       } finally {

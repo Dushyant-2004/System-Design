@@ -1,5 +1,4 @@
-const Groq = require('groq-sdk');
-const { AppError } = require('../middleware/errorHandler');
+import Groq from 'groq-sdk';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -90,14 +89,56 @@ Rules:
 - Make sure the JSON is VALID and COMPLETE
 - Do NOT include any text outside the JSON object`;
 
-const generateSystemDesign = async (prompt) => {
+function getDefaultField(field: string): Record<string, any> {
+  const defaults: Record<string, any> = {
+    microservices: [],
+    databaseSchema: [],
+    apiEndpoints: [],
+    cachingStrategy: { approach: 'Not specified', tools: [], layers: [] },
+    loadBalancing: {
+      approach: 'Not specified',
+      algorithm: 'Round Robin',
+      tools: [],
+      details: '',
+    },
+    scalingStrategy: {
+      horizontal: { description: 'Not specified', services: [], autoScalingRules: [] },
+      vertical: { description: 'Not specified', services: [] },
+    },
+    infrastructure: {
+      cloudProvider: 'AWS',
+      services: [],
+      regions: [],
+      estimatedCost: 'N/A',
+    },
+    systemFlow: { description: 'Not specified', steps: [] },
+  };
+  return defaults[field] || {};
+}
+
+export class AppError extends Error {
+  statusCode: number;
+  status: string;
+  isOperational: boolean;
+  details: string[] | null;
+
+  constructor(message: string, statusCode: number, details: string[] | null = null) {
+    super(message);
+    this.statusCode = statusCode;
+    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
+    this.isOperational = true;
+    this.details = details;
+  }
+}
+
+export async function generateSystemDesign(prompt: string) {
   const startTime = Date.now();
 
-  try {
-    if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
-      throw new AppError('Groq API key is not configured. Set GROQ_API_KEY in .env', 500);
-    }
+  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your_groq_api_key_here') {
+    throw new AppError('Groq API key is not configured. Set GROQ_API_KEY in .env', 500);
+  }
 
+  try {
     const chatCompletion = await groq.chat.completions.create({
       messages: [
         {
@@ -122,11 +163,10 @@ const generateSystemDesign = async (prompt) => {
       throw new AppError('Empty response received from AI service', 502);
     }
 
-    let parsed;
+    let parsed: Record<string, any>;
     try {
       parsed = JSON.parse(responseText);
-    } catch (parseError) {
-      // Try to extract JSON from response if wrapped in markdown
+    } catch {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
@@ -140,7 +180,6 @@ const generateSystemDesign = async (prompt) => {
       }
     }
 
-    // Validate required fields
     const requiredFields = [
       'microservices',
       'databaseSchema',
@@ -155,7 +194,6 @@ const generateSystemDesign = async (prompt) => {
     const missingFields = requiredFields.filter((field) => !parsed[field]);
     if (missingFields.length > 0) {
       console.warn('AI response missing fields:', missingFields);
-      // Fill in defaults for missing fields
       missingFields.forEach((field) => {
         parsed[field] = getDefaultField(field);
       });
@@ -163,11 +201,14 @@ const generateSystemDesign = async (prompt) => {
 
     const generationTimeMs = Date.now() - startTime;
     return { data: parsed, generationTimeMs };
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof AppError) throw error;
 
     if (error.status === 429) {
-      throw new AppError('AI service rate limit reached. Please wait a moment and try again.', 429);
+      throw new AppError(
+        'AI service rate limit reached. Please wait a moment and try again.',
+        429
+      );
     }
 
     if (error.status === 401) {
@@ -177,23 +218,4 @@ const generateSystemDesign = async (prompt) => {
     console.error('Groq API Error:', error.message);
     throw new AppError(`AI service error: ${error.message}`, 502);
   }
-};
-
-function getDefaultField(field) {
-  const defaults = {
-    microservices: [],
-    databaseSchema: [],
-    apiEndpoints: [],
-    cachingStrategy: { approach: 'Not specified', tools: [], layers: [] },
-    loadBalancing: { approach: 'Not specified', algorithm: 'Round Robin', tools: [], details: '' },
-    scalingStrategy: {
-      horizontal: { description: 'Not specified', services: [], autoScalingRules: [] },
-      vertical: { description: 'Not specified', services: [] },
-    },
-    infrastructure: { cloudProvider: 'AWS', services: [], regions: [], estimatedCost: 'N/A' },
-    systemFlow: { description: 'Not specified', steps: [] },
-  };
-  return defaults[field] || {};
 }
-
-module.exports = { generateSystemDesign };

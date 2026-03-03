@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = '/api';
 
 export interface Design {
   _id: string;
@@ -158,7 +158,7 @@ class ApiClient {
 
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new ApiError(
-          'Unable to connect to the server. Please ensure the backend is running.',
+          'Unable to connect to the server. Please try again later.',
           0
         );
       }

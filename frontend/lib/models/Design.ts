@@ -1,6 +1,16 @@
-const mongoose = require('mongoose');
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
-const designSchema = new mongoose.Schema(
+export interface IDesign extends Document {
+  title: string;
+  prompt: string;
+  structuredAIResponse: Record<string, any>;
+  status: 'generating' | 'completed' | 'failed';
+  generationTimeMs?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const designSchema = new Schema<IDesign>(
   {
     title: {
       type: String,
@@ -28,7 +38,10 @@ const designSchema = new mongoose.Schema(
       databaseSchema: [
         {
           name: { type: String, required: true },
-          type: { type: String, enum: ['SQL', 'NoSQL', 'Graph', 'TimeSeries', 'Cache'] },
+          type: {
+            type: String,
+            enum: ['SQL', 'NoSQL', 'Graph', 'TimeSeries', 'Cache'],
+          },
           tables: [
             {
               name: { type: String },
@@ -48,7 +61,10 @@ const designSchema = new mongoose.Schema(
           service: { type: String },
           endpoints: [
             {
-              method: { type: String, enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
+              method: {
+                type: String,
+                enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+              },
               path: { type: String },
               description: { type: String },
               auth: { type: Boolean, default: true },
@@ -127,6 +143,8 @@ const designSchema = new mongoose.Schema(
 designSchema.index({ createdAt: -1 });
 designSchema.index({ title: 'text', prompt: 'text' });
 
-const Design = mongoose.model('Design', designSchema);
+// Prevent model recompilation in serverless/hot-reload
+const Design: Model<IDesign> =
+  mongoose.models.Design || mongoose.model<IDesign>('Design', designSchema);
 
-module.exports = Design;
+export default Design;

@@ -21,6 +21,7 @@ function errorResponse(error: unknown) {
   );
 }
 
+
 // --------------- GET /api/designs/[id] ---------------
 export async function GET(
   request: NextRequest,
